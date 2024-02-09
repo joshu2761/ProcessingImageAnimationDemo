@@ -71,7 +71,7 @@ public class Sketch extends PApplet {
       for (ArrayList<PVector> trail : foodTrails) {
         for (int i = 0; i < trail.size() - 1; i++) {
           fill(0, 255, 0);
-          tint(255, 126);
+          tint(255, 200);
           ellipse(trail.get(i).x, trail.get(i).y, 2, 2);
         }
       }
@@ -105,7 +105,7 @@ public class Sketch extends PApplet {
       
       if (!ant.goHome) {
         
-        if (rand.nextInt(11) > foodTrails.size()) {
+        if (foodTrails.isEmpty() || rand.nextInt(11) > foodTrails.size()) {
 
           ant.x += Math.cos(ant.rotation) * 2;
           ant.y += Math.sin(ant.rotation) * 2;
@@ -117,11 +117,17 @@ public class Sketch extends PApplet {
           if (ant.time > 500) {
             ant.goHome = true;
           }
+        }
+        
+        else {
+
+          ArrayList<PVector> trail = foodTrails.get(rand.nextInt(foodTrails.size()));
+          
+          ant.x = trail.get(ant.time).x;
+          ant.y = trail.get(ant.time).y;
           
         }
         
-
-
         if (dist(ant.x, ant.y, foodX, foodY) < 50) {
 
           ant.rotation = (float) Math.atan2(foodY - ant.y, foodX - ant.x);
@@ -190,5 +196,3 @@ public class Sketch extends PApplet {
     }
   }
 }
-
-
