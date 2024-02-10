@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.lang.reflect.Array;
 import java.util.Random;
+
+import javax.swing.text.html.HTMLDocument.Iterator;
+
 import processing.core.PVector;
 
 
@@ -14,8 +17,10 @@ public class Sketch extends PApplet {
   float team1NestX = 100f;
   float team1NestY = 100f;
 
-  float foodX = 500f;
-  float foodY = 500f;
+  float foodX = 700f;
+  float foodY = 700f;
+
+  int foodAmount = 5000;
 
   int team1NumOfAnts;
   int team2Number;
@@ -29,12 +34,12 @@ public class Sketch extends PApplet {
   ArrayList<Ant> antsTeam1 = new ArrayList<Ant>();
   ArrayList<Ant> antsTeam2 = new ArrayList<Ant>();
 
-  ArrayList<ArrayList> foodTrails = new ArrayList<ArrayList>();
+  ArrayList<FoodTrail> foodTrails = new ArrayList<FoodTrail>();
 
   Random rand = new Random();
 
   public void settings() {
-    size(600, 600);
+    size(800, 800);
   
   }
 
@@ -42,53 +47,98 @@ public class Sketch extends PApplet {
     
     background(255);
     
-    antsTeam1.add(new Ant(team1NestX, team1NestY));
-    team1NumOfAnts = 100;
+    team1NumOfAnts = 500;
     team1Food = 0;
     globalTime = 0;
 
     spawnRate = 10;
 
-}
+  }
+
+
+
 
   public void draw() {
 
     background(255);
-    moveAnt();
     
     globalTime ++;
-    if (globalTime % spawnRate == 0 && antsTeam1.size() < team1NumOfAnts){
-      antsTeam1.add(new Ant(team1NestX, team1NestY));
+
+    // spawn ants
+    try {
+      if (globalTime % spawnRate == 0 && antsTeam1.size() < team1NumOfAnts) {
+        antsTeam1.add(new Ant(team1NestX, team1NestY, rand.nextInt(11) > foodTrails.size(), foodTrails.get(rand.nextInt(foodTrails.size())), rand.nextBoolean()));
+      }
+    }
+    catch (IllegalArgumentException e) {
+      antsTeam1.add(new Ant(team1NestX, team1NestY, false, new FoodTrail(new ArrayList<PVector>()), rand.nextBoolean()));
+    }
+
+    // draw food trails
+    if (foodTrails.size() > 0) {
+      for (FoodTrail foodTrail : foodTrails) {
+
+        for (int i = 0; i < foodTrail.trail.size() - 1; i++) {
+          fill(200, 255, 200);;
+          ellipse(foodTrail.trail.get(i).x, foodTrail.trail.get(i).y, 2, 2);
+        }
+
+        foodTrail.time ++;
+        
+        if (foodTrail.time > 1000) {
+          foodTrails.remove(foodTrail);
+        }
+        }
+      }
+    
+    
+    // Delete food trails that are too long
+    if (foodTrails.size() > 15) {
+      
+      int longestTrail = 0;
+
+      for (int i = 0; i < foodTrails.size(); i++) {
+        if (foodTrails.get(i).trail.size() > foodTrails.get(longestTrail).trail.size()) {
+          longestTrail = i;
+        }
+      }
+      
+      for (Ant ant : antsTeam1) {
+        if (ant.assignedTrail == foodTrails.get(longestTrail)) {
+
+          ant.explorer = rand.nextInt(31) > foodTrails.size() * 2;
+
+          if (ant.explorer) {
+            ant.assignedTrail = new FoodTrail(new ArrayList<PVector>());
+          }
+          else {
+            FoodTrail newAssignedTrail = foodTrails.get(rand.nextInt(foodTrails.size()));
+            while (newAssignedTrail == foodTrails.get(longestTrail)) {
+              newAssignedTrail = foodTrails.get(rand.nextInt(foodTrails.size()));
+            }
+            ant.assignedTrail = foodTrails.get(rand.nextInt(foodTrails.size()));
+        }
+      }
+      }
+      foodTrails.remove(longestTrail);
+      foodTrails.trimToSize();
+    }
+    moveAnt();
+
+    // draw food
+    fill(0, 126, 0);
+    ellipse(foodX, foodY, (int)(((double)foodAmount / 100)), (int)(((double)foodAmount / 100)));
+    if (foodAmount <= 0) {
+      foodX = 10000;
+      foodY = 10000;
+      foodAmount = 5000;
     }
 
     fill (255, 0, 0);
     ellipse(team1NestX, team1NestY, 25, 25);
 
-    fill(0, 255, 0);
-    ellipse(foodX, foodY, 25, 25);
 
-    if (foodTrails.size() > 0) {
-      for (ArrayList<PVector> trail : foodTrails) {
-        for (int i = 0; i < trail.size() - 1; i++) {
-          fill(0, 255, 0);
-          tint(255, 200);
-          ellipse(trail.get(i).x, trail.get(i).y, 2, 2);
-        }
-      }
-    }
 
-    if (foodTrails.size() > 10) {
-      
-      int longestTrail = 0;
-
-      for (int i = 0; i < foodTrails.size(); i++) {
-        if (foodTrails.get(i).size() > foodTrails.get(longestTrail).size()) {
-          longestTrail = i;
-        }
-      }
-
-      foodTrails.remove(longestTrail);
-    }
 
     //debug
     fill(0);
@@ -97,45 +147,121 @@ public class Sketch extends PApplet {
     text("Global Time: " + globalTime, 10, 30);
     text("Number of Ants on Screen: " + antsTeam1.size(), 10, 40);
     text("Spawn Rate: " + spawnRate, 10, 50);
+    text("Number of Food Trails: " + foodTrails.size(), 10, 60);
   }
 
+
   public void moveAnt() {
+
 
     for (Ant ant : antsTeam1) {
       
       if (!ant.goHome) {
         
-        if (foodTrails.isEmpty() || rand.nextInt(11) > foodTrails.size()) {
+        if (ant.explorer) {
 
           ant.x += Math.cos(ant.rotation) * 2;
           ant.y += Math.sin(ant.rotation) * 2;
           ant.rotation += rand.nextFloat() * 0.5 - 0.25;
+
+          if (dist(ant.x, ant.y, foodX, foodY) <= (double)foodAmount / 60) {
+
+            ant.rotation = (float) Math.atan2(foodY - ant.y, foodX - ant.x);
   
-          if (ant.x < 0 || ant.x > width || ant.y < 0 || ant.y > height) {
-            ant.rotation = -ant.rotation;
+            if (dist(ant.x, ant.y, foodX, foodY) <= 10) {
+              ant.goHome = true;
+              ant.hasFood = true;
+              ant.time = 0;
+            }
           }
-          if (ant.time > 500) {
+
+          if (ant.x > width) {
+            ant.x = width;
+            ant.rotation = (float) (Math.random() * Math.PI);
+          }
+          if (ant.x < 0) {
+            ant.x = 0;
+            ant.rotation = (float) (Math.random() * Math.PI);
+          }
+          if (ant.y > height) {
+            ant.y = height;
+            ant.rotation = (float) (Math.random() * Math.PI);
+          }
+          if (ant.y < 0) {
+            ant.y = 0;
+            ant.rotation = (float) (Math.random() * Math.PI);
+          }
+          if (ant.time > 750) {
             ant.goHome = true;
+            if (ant.time > 2000) {
+              ant.trail.clear();
+              ant.time = 0;
+              ant.x = team1NestX;
+              ant.y = team1NestY;
+              if (foodTrails.size() > 0) {
+                ant.explorer = rand.nextInt(31) > foodTrails.size() * 2;
+                ant.assignedTrail = foodTrails.get(rand.nextInt(foodTrails.size()));
+              }
+              else {
+                ant.explorer = true;
+              }
+            } 
           }
         }
         
         else {
 
-          ArrayList<PVector> trail = foodTrails.get(rand.nextInt(foodTrails.size()));
-          
-          ant.x = trail.get(ant.time).x;
-          ant.y = trail.get(ant.time).y;
-          
-        }
-        
-        if (dist(ant.x, ant.y, foodX, foodY) < 50) {
+          try {
+            if (dist(ant.x, ant.y, foodX, foodY) > (int)(((double)foodAmount / 50))) {
+              if (ant.exploreUp) {
+                ant.rotation = (float) Math.atan2(ant.assignedTrail.trail.get(ant.time).y 
+                                - ant.y, ant.assignedTrail.trail.get(ant.time).x - ant.x)
+                                + rand.nextFloat(0.7f);
+              }
+              else {
+                ant.rotation = (float) Math.atan2(ant.assignedTrail.trail.get(ant.time).y 
+                                - ant.y, ant.assignedTrail.trail.get(ant.time).x - ant.x)
+                                - rand.nextFloat(0.7f);
+              }
+            }
+            else if (dist(ant.x, ant.y, foodX, foodY) <= (int)(((double)foodAmount / 50))) {
 
-          ant.rotation = (float) Math.atan2(foodY - ant.y, foodX - ant.x);
+              ant.rotation = (float) Math.atan2(foodY - ant.y, foodX - ant.x);
+    
+              if (dist(ant.x, ant.y, foodX, foodY) <= (int)(((double)foodAmount / 50))) {
+                ant.goHome = true;
+                ant.hasFood = true;
+                ant.time = 0;
+                foodAmount --;
+              }
+            }
+            ant.x += Math.cos(ant.rotation) * 2;
+            ant.y += Math.sin(ant.rotation) * 2;
 
-          if (dist(ant.x, ant.y, foodX, foodY) < 25) {
+          }
+          catch (IndexOutOfBoundsException e) {
+
+            ant.explorer = true;
+            ant.assignedTrail = new FoodTrail(new ArrayList<PVector>());
+            foodTrails.remove(ant.assignedTrail);
+          }
+
+          if (ant.time > 1000) {
             ant.goHome = true;
-            ant.hasFood = true;
-            ant.time = 0;
+
+            if (ant.time > 2000) {
+              ant.trail.clear();
+              ant.time = 0;
+              ant.x = team1NestX;
+              ant.y = team1NestY;
+              if (foodTrails.size() > 0) {
+                ant.explorer = rand.nextInt(31) > foodTrails.size() * 2;
+                ant.assignedTrail = foodTrails.get(rand.nextInt(foodTrails.size()));
+              }
+              else {
+                ant.explorer = true;
+              }
+            } 
           }
         }
 
@@ -149,41 +275,50 @@ public class Sketch extends PApplet {
           if (ant.hasFood) {
             ant.x = ant.trail.get(ant.trail.size() - ant.time - 1).x;
             ant.y = ant.trail.get(ant.trail.size() - ant.time - 1).y;
-
-            for (int i = ant.trail.size() - 1; i >= ant.trail.size() - ant.time; i--) {
-              
-              fill(0, 255, 0);
-              tint(255, 126);
-              ellipse(ant.trail.get(i).x, ant.trail.get(i).y, 2, 2);
-            }
           }
 
           else {
             ant.x = ant.trail.get(ant.trail.size() - (ant.time - 500) - 1).x;
             ant.y = ant.trail.get(ant.trail.size() - (ant.time - 500) - 1).y;
           }
+
+          if (dist(ant.x, ant.y, team1NestX, team1NestY) <= 50) {
+            
+            ant.rotation = atan2(team1NestY - ant.y, team1NestX - ant.x);
+            ant.x += Math.cos(ant.rotation) * 2;
+            ant.y += Math.sin(ant.rotation) * 2;
+          }
         }
         catch (IndexOutOfBoundsException e) {
 
           if (ant.hasFood) {
-            team1NumOfAnts ++;
-            team1Food += 10;
+            team1Food ++;
             ant.hasFood = false;
             ArrayList<PVector> temp = new ArrayList<PVector>(ant.trail);
-            foodTrails.add(temp);
+
+            foodTrails.add(new FoodTrail(temp));
           }
           ant.goHome = false;
           ant.trail.clear();
           ant.time = 0;
+          ant.x = team1NestX;
+          ant.y = team1NestY;
+          
+          if (foodTrails.size() > 0) {
+            ant.explorer = rand.nextInt(31) > foodTrails.size() * 2;
+            ant.assignedTrail = foodTrails.get(rand.nextInt(foodTrails.size()));
+          }
+          else {
+            ant.explorer = true;
+          }
         }
-    }
+      } 
       fill(0);
       noStroke();
       noTint();
-      ellipse(ant.x, ant.y, 2, 2);
+      ellipse(ant.x, ant.y, 3, 3);
 
       ant.time ++;
-
     }
   } 
   public void keyPressed() {
@@ -193,6 +328,12 @@ public class Sketch extends PApplet {
     }
     else if (key == '-') {
       spawnRate --;
+    }
+
+    if (key == 'r') {
+      foodX = rand.nextInt(width);
+      foodY = rand.nextInt(height);
+      foodAmount = 5000;
     }
   }
 }
