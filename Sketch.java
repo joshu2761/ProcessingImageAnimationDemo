@@ -76,6 +76,7 @@ public class Sketch extends PApplet {
 
     // draw food trails
     if (foodTrails.size() > 0) {
+      ArrayList<FoodTrail> toRemove = new ArrayList<>();
       for (FoodTrail foodTrail : foodTrails) {
 
         for (int i = 0; i < foodTrail.trail.size() - 1; i++) {
@@ -86,10 +87,11 @@ public class Sketch extends PApplet {
         foodTrail.time ++;
         
         if (foodTrail.time > 1000) {
-          foodTrails.remove(foodTrail);
-        }
+          toRemove.add(foodTrail);
         }
       }
+      foodTrails.removeAll(toRemove);
+    }
     
     
     // Delete food trails that are too long
@@ -228,7 +230,7 @@ public class Sketch extends PApplet {
 
               ant.rotation = (float) Math.atan2(foodY - ant.y, foodX - ant.x);
     
-              if (dist(ant.x, ant.y, foodX, foodY) <= (int)(((double)foodAmount / 50))) {
+              if (dist(ant.x, ant.y, foodX, foodY) <= (int)(((double)foodAmount / 120))) {
                 ant.goHome = true;
                 ant.hasFood = true;
                 ant.time = 0;
